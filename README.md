@@ -17,19 +17,23 @@
 
 ## 界面预览
 
-> 以下为 v0.1 旧版（Element Plus）界面截图，v0.2 已切换为 o-design 风格新前端，新版截图待补充。
+以下为 v0.2（o-design 风格）界面截图。
 
-| 登录 | 总览 |
+| 登录 | 工作台总览 |
 |------|------|
-| ![登录页](docs/screenshots/01-login.png) | ![总览](docs/screenshots/02-dashboard.png) |
+| ![登录页](docs/screenshots/01-login.png) | ![工作台总览](docs/screenshots/02-dashboard.png) |
 
-| 故障诊断 | 智能巡检 |
+| 团队列表 | 团队详情 |
 |----------|----------|
-| ![故障诊断](docs/screenshots/03-diagnosis.png) | ![智能巡检](docs/screenshots/06-inspection.png) |
+| ![团队列表](docs/screenshots/03-teams.png) | ![团队详情](docs/screenshots/04-team-detail.png) |
 
-| 性能图表 | 规则管理 |
+| 任务结果分析 | 规则管理 |
 |----------|----------|
-| ![性能图表](docs/screenshots/04-metrics.png) | ![规则管理](docs/screenshots/05-rules.png) |
+| ![任务结果分析](docs/screenshots/05-task-result.png) | ![规则管理](docs/screenshots/06-rules.png) |
+
+| 性能图表 | 智能巡检 |
+|----------|----------|
+| ![性能图表](docs/screenshots/07-metrics.png) | ![智能巡检](docs/screenshots/08-inspection.png) |
 
 ## 技术栈
 
