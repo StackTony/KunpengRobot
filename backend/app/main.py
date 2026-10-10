@@ -1,6 +1,7 @@
 """API 服务入口: uvicorn app.main:app"""
 import logging
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,7 @@ from app.models import Permission, Role, User  # noqa: 确保建表
 from app.models.asset import AssetLibrary  # noqa
 from app.models.audit import AuditLog  # noqa
 from app.models.rule import Rule  # noqa
-from app.models.task import Task, Report  # noqa
+from app.models.task import Task, Report, TaskStatus, TaskType  # noqa
 from app.models.team import Team, TeamMember, TeamNotice  # noqa
 from app.models.metric import MetricPoint, UserPreference  # noqa
 from app.models.analyze import ParsedEventRecord  # noqa
@@ -81,7 +82,80 @@ async def seed_initial_data() -> None:
 
     if settings.SEED_DEMO_DATA:
         await seed_teams()
-        # 演示解析任务在 seed_demo_tasks() 中创建 (依赖解析器模块, 见 app/modules/analyze)
+        await seed_demo_tasks()
+
+
+async def seed_demo_tasks() -> None:
+    """演示解析任务 (幂等): 生成样例日志 → 解析 → 事件入库 → 五段报告.
+
+    给工作台 KPI/团队任务列表/结果页演示提供真实数据 (不经过队列, 直接成品).
+    """
+    from datetime import timedelta
+
+    from app.models.analyze import ParsedEventRecord
+    from app.modules.analyze import ANALYZE_PARSERS
+    from app.modules.analyze.demo_logs import DEMO_LOG_GENS
+    from app.modules.analyze.report_builder import build_llm_report
+
+    # (团队名, 任务名, parser, 创建用户, count, seed, ipPool)
+    DEMO_TASKS = [
+        ("北京A", "A 区例行 SEL 巡检", "sel", "guchuang", 360, 7,
+         ["10.1.3.11", "10.1.3.12", "10.1.3.21", "10.1.3.22", "10.1.4.31", "10.1.4.32"]),
+        ("北京A", "PSU2 故障专项分析", "redfish", "jiangguanli", 180, 21,
+         ["10.1.3.11", "10.1.3.12", "10.1.3.21", "10.1.3.22", "10.1.4.31", "10.1.4.32"]),
+        ("上海B", "B 区磁盘 IO 错误分析", "syslog", "jiangguanli", 280, 13,
+         ["10.2.8.101", "10.2.8.102", "10.2.8.103", "10.2.9.10"]),
+        ("上海B", "内核超时日志排查", "dmesg", "zhangshenpi", 240, 29,
+         ["10.2.8.101", "10.2.8.102", "10.2.8.103", "10.2.9.10"]),
+    ]
+
+    async with AsyncSessionLocal() as db:
+        for team_name, task_name, parser_type, username, count, seed, ips in DEMO_TASKS:
+            if (await db.execute(select(Task).where(Task.name == task_name))).scalar_one_or_none():
+                continue  # 幂等
+            team = (await db.execute(select(Team).where(Team.name == team_name))).scalar_one_or_none()
+            asset = (await db.execute(select(AssetLibrary).where(
+                AssetLibrary.team_id == team.id))).scalars().first() if team else None
+            creator = (await db.execute(select(User).where(User.username == username))).scalar_one_or_none()
+            if asset is None or creator is None:
+                continue
+
+            text = DEMO_LOG_GENS[parser_type]({"count": count, "seed": seed, "ipPool": ips})
+            parser = ANALYZE_PARSERS[parser_type]
+            events = parser.parse(text)
+            now_dt = datetime.now()
+
+            task = Task(
+                type=TaskType.analyze, status=TaskStatus.done,
+                user_id=creator.id,
+                filename=parser.def_.file_hint.replace("*", str(seed)),
+                storage_path="", params={},
+                name=task_name, parser_type=parser_type, asset_id=asset.id,
+                log_size=len(text.encode("utf-8")), event_count=len(events),
+                progress=100,
+                created_at=now_dt - timedelta(hours=2 + seed % 40),
+                finished_at=now_dt - timedelta(hours=1 + seed % 20),
+            )
+            db.add(task)
+            await db.flush()
+            db.add_all([ParsedEventRecord(
+                task_id=task.id, ts=e.timestamp, source_ip=e.source_ip,
+                severity=e.severity, category=e.category, error_code=e.error_code,
+                raw=e.raw, fields=e.fields or {}) for e in events])
+            sections = build_llm_report(events, parser.def_.name)
+            db.add(Report(
+                task_id=task.id,
+                summary="\n\n".join(f"【{s['title']}】\n" + "\n".join(s["lines"]) for s in sections),
+                content={"parser": parser_type, "parser_name": parser.def_.name,
+                         "sections": sections, "event_count": len(events), "llm": False},
+            ))
+            db.add(AuditLog(
+                user_id=creator.id,
+                user_name=creator.display_name or creator.username,
+                action="执行解析任务", team_id=team.id,
+                target=f"{asset.name} / {task_name}（{len(events)} 条事件）",
+            ))
+        await db.commit()
 
 
 async def seed_teams() -> None:

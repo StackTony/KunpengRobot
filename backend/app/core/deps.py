@@ -77,6 +77,56 @@ def require_permission(*permission_codes: str):
     return checker
 
 
+def is_platform_admin(user: User) -> bool:
+    return "admin" in {r.name for r in user.roles}
+
+
+async def load_team_role(db: AsyncSession, user: User, team_id: int):
+    """返回 (team, my_role); 平台管理员对任意团队返回 role='owner' 语义的 admin."""
+    from app.models.team import Team, TeamMember
+
+    team = (await db.execute(select(Team).where(Team.id == team_id))).scalar_one_or_none()
+    if team is None:
+        return None, None
+    if is_platform_admin(user):
+        return team, "owner"
+    member = (await db.execute(
+        select(TeamMember).where(TeamMember.team_id == team_id, TeamMember.user_id == user.id)
+    )).scalar_one_or_none()
+    return team, (member.role if member else None)
+
+
+async def ensure_team_perm(db: AsyncSession, user: User, team_id: int, perm: str):
+    """校验用户在团队内角色具备 perm; 返回 (team, role), 不满足抛 403/404."""
+    from app.core.team_rbac import team_role_has_perm
+
+    team, role = await load_team_role(db, user, team_id)
+    if team is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "团队不存在")
+    if role is None:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "非团队成员, 无权操作")
+    if not team_role_has_perm(role, perm):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"需要团队权限: {perm}")
+    return team, role
+
+
+def require_team_perm(perm: str):
+    """工厂依赖: 路由路径含 {team_id} 时使用, 返回 (user, team, role).
+
+    用法: trio: Annotated[tuple[User, Team, str], Depends(require_team_perm("asset:create"))]
+    非路径场景 (如经 asset_id 反查团队) 请改用 ensure_team_perm().
+    """
+
+    async def checker(
+        team_id: int,
+        user: Annotated[User, Depends(get_current_user)],
+        db: Annotated[AsyncSession, Depends(get_db)],
+    ):
+        return await ensure_team_perm(db, user, team_id, perm)
+
+    return checker
+
+
 # 常用权限依赖
 RequireAdmin = Depends(require_permission("admin"))
 RequireRuleManage = Depends(require_permission("admin", "rule:manage"))
