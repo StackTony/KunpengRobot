@@ -1,9 +1,9 @@
-"""分析任务模型 (诊断/巡检统一)."""
+"""分析任务模型 (诊断/巡检/解析任务统一)."""
 import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import BigInteger, DateTime, Enum, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -13,6 +13,7 @@ from app.core.database import Base
 class TaskType(str, enum.Enum):
     diagnosis = "diagnosis"      # 故障诊断日志分析
     inspection = "inspection"    # 智能巡检
+    analyze = "analyze"          # 解析任务 (witty: 指定解析器的事件化分析)
 
 
 class TaskStatus(str, enum.Enum):
@@ -36,6 +37,13 @@ class Task(Base):
     filename: Mapped[str] = mapped_column(String(255), default="")
     storage_path: Mapped[str] = mapped_column(String(512), default="")  # 日志包存储位置
     params: Mapped[dict] = mapped_column(JSONB, default=dict)           # 附加参数 (服务器类型/巡检模板等)
+
+    # 解析任务扩展 (witty 接入; 诊断/巡检任务这些列为空)
+    name: Mapped[str] = mapped_column(String(128), default="")          # 任务名称
+    parser_type: Mapped[str] = mapped_column(String(32), default="")    # sel/redfish/syslog/dmesg/windows/regex
+    asset_id: Mapped[int | None] = mapped_column(ForeignKey("asset_libraries.id"), index=True, nullable=True)
+    log_size: Mapped[int] = mapped_column(BigInteger, default=0)        # 上传日志字节数
+    event_count: Mapped[int] = mapped_column(Integer, default=0)        # 解析事件数 (冗余计数, 避免 COUNT)
 
     # 执行
     progress: Mapped[int] = mapped_column(Integer, default=0)           # 0-100

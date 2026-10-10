@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     # 上传限流 (按用户, Redis 计数)
     UPLOAD_RATE_LIMIT_PER_MIN: int = 30
 
+    # 演示数据种子 (5 个演示账号 demo123 + 示例团队/资产库/任务); 生产环境置 False
+    SEED_DEMO_DATA: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

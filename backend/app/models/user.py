@@ -28,6 +28,10 @@ class User(Base):
     hashed_password: Mapped[str] = mapped_column(String(128))
     display_name: Mapped[str] = mapped_column(String(64), default="")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    # 展示扩展 (witty User 模型; 存量库由 schema_guard 补列)
+    title: Mapped[str] = mapped_column(String(64), default="")     # 职位
+    dept: Mapped[str] = mapped_column(String(64), default="")       # 部门
+    avatar_hue: Mapped[int] = mapped_column(Integer, default=212)   # 头像色相
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     roles: Mapped[list["Role"]] = relationship(secondary=user_role, lazy="selectin", back_populates="users")
