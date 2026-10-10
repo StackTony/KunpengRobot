@@ -114,18 +114,25 @@ docker compose up -d       # 拉起 postgres / redis / api / worker / web
 KunpengRobot/
 ├── backend/
 │   └── app/
-│       ├── api/            # 认证 / 任务上传 / SSE / 规则 / 指标
-│       ├── core/           # 配置 / 安全 / 数据库 / 依赖注入
-│       ├── models/         # 用户-角色-权限 / 任务 / 规则 / 指标
+│       ├── api/            # 认证/用户/团队/通知/审计/工作台/资产库/任务/
+│       │                   # 聚合分析+LLM+SSE/规则/指标
+│       ├── core/           # 配置 / 安全 / 数据库 / 双级 RBAC 依赖注入
+│       ├── models/         # 用户-角色-权限 / 团队-成员-通知-资产库 / 任务 /
+│       │                   # 解析事件 / 规则 / 指标 / 用户偏好 / 审计
 │       ├── queue/          # Redis Stream 任务队列
 │       ├── events/         # 事件总线（Pub/Sub + Stream 留存）
-│       ├── modules/        # 诊断流水线 / 巡检 / 解析器与检查项插件
+│       ├── modules/        # analyze：6 解析器插件 / 聚合 / 五段报告 / 演示日志
 │       ├── worker/         # Worker 消费循环 + 定时调度
 │       └── metrics/        # 指标分区管理
 ├── frontend/               # Vue3 + TS + Pinia（o-design 风格，基于 witty-log-analyzer）
 ├── deploy/                 # docker-compose / Nginx / 裸机脚本
-└── docs/                   # 框架设计文档 / 界面截图
+└── docs/                   # 框架设计 / 功能点清单 / 界面截图
 ```
+
+## 开发约定
+
+- **提交粒度**：每次提交的变动行数不超过 **1000 行**（含新增与删除）；大改动拆分为多个小提交，便于回溯与审查
+- 提交信息用中文，格式 `type(scope): 摘要`（feat / fix / docs / refactor / chore）
 
 ## 后续规划
 
