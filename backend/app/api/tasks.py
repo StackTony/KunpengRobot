@@ -8,8 +8,8 @@ import uuid
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile, status
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.analysis import _ensure_task_perm, _load_visible_task, _team_id_of_task
@@ -32,14 +32,14 @@ ALLOWED_SUFFIXES = {".zip", ".tar", ".gz", ".tgz", ".log", ".txt",
                     ".json", ".jsonl"}  # witty: redfish/windows 为 JSON 导出
 
 
-def _save_upload(file: UploadFile, task_id: uuid.UUID, limit: int) -> tuple[Path, int]:
+async def _save_upload(file: UploadFile, task_id: uuid.UUID, limit: int) -> tuple[Path, int]:
     """流式落盘 (防超大), 返回 (storage_path, size); 超限自动清理."""
     upload_dir = Path(settings.DATA_DIR) / "uploads" / str(task_id)
     upload_dir.mkdir(parents=True, exist_ok=True)
     storage_path = upload_dir / (file.filename or "upload.bin")
     size = 0
     with open(storage_path, "wb") as f:
-        while chunk := file.read(1024 * 1024):
+        while chunk := await file.read(1024 * 1024):
             size += len(chunk)
             if size > limit:
                 f.close()
@@ -118,11 +118,11 @@ async def upload(
     db: Annotated[AsyncSession, Depends(get_db)],
     user: Annotated[User, Depends(get_current_user)],
     redis: Annotated[object, Depends(get_redis)],
-    server_type: str = "",
-    task_type: str = "diagnosis",   # diagnosis / analyze / inspection
-    parser_type: str = "",
-    task_name: str = "",
-    asset_id: int | None = None,
+    server_type: Annotated[str, Form()] = "",
+    task_type: Annotated[str, Form()] = "diagnosis",   # diagnosis / analyze / inspection
+    parser_type: Annotated[str, Form()] = "",
+    task_name: Annotated[str, Form()] = "",
+    asset_id: Annotated[int | None, Form()] = None,
 ):
     """上传日志包: 保存文件 → 创建任务 → 入队 → 立即返回 task_id (分析异步进行)."""
     if task_type not in ("diagnosis", "analyze", "inspection"):
@@ -147,7 +147,7 @@ async def upload(
         _, asset = await _check_analyze_target(db, user, parser_type, asset_id)
 
     task_id = uuid.uuid4()
-    storage_path, size = _save_upload(file, task_id, settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024)
+    storage_path, size = await _save_upload(file, task_id, settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024)
 
     task = Task(
         id=task_id, type=TaskType(task_type), status=TaskStatus.pending,
@@ -215,8 +215,8 @@ async def get_task(
         id=task.id, type=task.type, status=task.status, filename=task.filename,
         progress=task.progress, error=task.error, created_at=task.created_at,
         finished_at=task.finished_at, name=task.name, parser_type=task.parser_type,
-        asset_id=task.asset_id, log_size=t.log_size, event_count=task.event_count,
-        creator_name=(creator[0] or creator[1]) if creator else "",
+        asset_id=task.asset_id, log_size=task.log_size, event_count=task.event_count,
+        creator_name=creator[0].display_name if creator else "",
         asset_name=asset_name)
 
 
@@ -233,6 +233,11 @@ async def delete_task(
     await _ensure_task_perm(db, user, task, "task:delete")
     team_id = await _team_id_of_task(db, task)
     log_audit(db, user, "删除解析任务", task.name or task.filename, team_id=team_id)
+    # 先删关联数据 (Report/ParsedEventRecord, ORM 层未配置级联)
+    from app.models.analyze import ParsedEventRecord
+    from app.models.task import Report
+    await db.execute(sa_delete(Report).where(Report.task_id == task_id))
+    await db.execute(sa_delete(ParsedEventRecord).where(ParsedEventRecord.task_id == task_id))
     await db.delete(task)
     await db.commit()
     if task.storage_path:

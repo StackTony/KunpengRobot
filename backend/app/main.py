@@ -6,7 +6,7 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api import api_router
 from app.core.config import get_settings
@@ -83,6 +83,63 @@ async def seed_initial_data() -> None:
     if settings.SEED_DEMO_DATA:
         await seed_teams()
         await seed_demo_tasks()
+        await seed_builtin_rules()
+        await seed_demo_metrics()
+
+
+async def seed_demo_metrics() -> None:
+    """演示性能指标 (幂等): 近 48h 每 10 分钟一点, 3 主机 × CPU/内存两指标."""
+    import math
+    from datetime import datetime, timedelta, timezone
+
+    from app.metrics.store import ensure_partitions
+    from app.models.metric import MetricPoint
+
+    async with AsyncSessionLocal() as db:
+        count = (await db.execute(select(func.count()).select_from(MetricPoint))).scalar_one()
+        if count > 0:
+            return
+        await ensure_partitions(db)
+        now = datetime.now(timezone.utc)
+        points = []
+        for host, base_cpu, base_mem in (("server-bj-01", 42, 63), ("server-bj-02", 55, 71), ("server-sh-01", 35, 58)):
+            for i in range(288, 0, -1):  # 48h, 10min 间隔
+                t = now - timedelta(minutes=i * 10)
+                phase = i / 288 * math.pi * 4
+                cpu = max(3, min(99, base_cpu + 18 * math.sin(phase) + 6 * math.sin(phase * 7)))
+                mem = max(10, min(98, base_mem + 8 * math.sin(phase / 2 + 1)))
+                points.append(MetricPoint(metric_time=t, host=host, metric_name="cpu.usage", value=round(cpu, 2)))
+                points.append(MetricPoint(metric_time=t, host=host, metric_name="mem.used_pct", value=round(mem, 2)))
+        db.add_all(points)
+        await db.commit()
+
+
+async def seed_builtin_rules() -> None:
+    """内置预置规则 (幂等): 常见故障模式, 涵盖关键字/正则/阈值三类匹配."""
+    from app.models.rule import MatchType, Rule, Severity
+
+    BUILTIN_RULES = [
+        ("OOM 内存溢出", "内核或进程 OOM 记录，常见于内存泄漏/超卖",
+         MatchType.keyword, "Out of memory", {}, Severity.critical, "syslog", 10),
+        ("磁盘 IO 错误", "块设备 IO 错误与重排，预示磁盘劣化",
+         MatchType.regex, r"(?:I/O error|Buffer I/O error|blk_update_request)", {},
+         Severity.error, "syslog", 20),
+        ("CPU 使用率过高", "持续高 CPU 告警阈值",
+         MatchType.threshold, "", {"metric": "cpu.usage", "op": ">", "value": 90},
+         Severity.warn, "", 30),
+        ("服务启动失败", "systemd 服务启动失败记录",
+         MatchType.keyword, "Failed with result", {}, Severity.error, "syslog", 40),
+    ]
+    async with AsyncSessionLocal() as db:
+        for name, desc, mtype, pattern, threshold, sev, log_type, prio in BUILTIN_RULES:
+            exists = (await db.execute(select(Rule).where(Rule.name == name))).scalar_one_or_none()
+            if exists is None:
+                db.add(Rule(
+                    name=name, description=desc, match_type=mtype, pattern=pattern,
+                    threshold=threshold, severity=sev, log_type=log_type,
+                    priority=prio, enabled=True, is_builtin=True,
+                ))
+        await db.commit()
 
 
 async def seed_demo_tasks() -> None:

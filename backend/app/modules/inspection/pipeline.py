@@ -1,5 +1,6 @@
 """巡检流水线: 解析输入 → 遍历检查项插件 → 规则引擎 → LLM 总结 → 报告."""
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID
 
@@ -95,8 +96,12 @@ async def _pipeline(db: AsyncSession, task: Task, bus: EventBus, is_cancelled) -
         await bus.publish(task_id, "finding", {
             "rule_name": f.rule_name, "severity": f.severity, "text": f.raw[:300]})
 
-    # 4. 指标入库
+    # 4. 指标入库 (checker 产出的计数指标缺时间戳, 统一补齐为当前时间)
+    now = datetime.now(timezone.utc)
     all_metrics = ctx.metrics + [m for r in results for m in r.metrics]
+    for m in all_metrics:
+        m.setdefault("metric_time", now)
+        m.setdefault("task_id", task_id)
     if all_metrics:
         db.add_all([MetricPoint(**m) for m in all_metrics[:100000]])
 
