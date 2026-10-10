@@ -14,6 +14,8 @@ from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal, Base, engine
 from app.events.event_bus import EventBus
 from app.models.task import Task, TaskStatus
+from app.modules.analyze.llm_report import run_llm_report
+from app.modules.analyze.pipeline import run_analyze
 from app.modules.diagnosis.pipeline import run_diagnosis
 from app.modules.inspection.pipeline import run_inspection
 from app.queue.task_queue import TaskQueue
@@ -25,6 +27,7 @@ settings = get_settings()
 PIPELINES = {
     "diagnosis": run_diagnosis,
     "inspection": run_inspection,
+    "analyze": run_analyze,
 }
 
 shutdown = asyncio.Event()
@@ -51,12 +54,17 @@ async def make_cancel_checker(redis: Redis, task_id: str):
 
 async def handle_message(queue: TaskQueue, bus: EventBus, redis: Redis, msg_id: str,
                          task_id: str, task_type: str, payload: dict) -> None:
-    pipeline = PIPELINES.get(task_type)
     try:
-        if pipeline is None:
-            raise RuntimeError(f"未知任务类型: {task_type}")
         cancelled = await make_cancel_checker(redis, task_id)
-        await pipeline(uuid.UUID(task_id), bus, cancelled)
+        if task_type == "llm":
+            # 按需 LLM 报告: 独立签名, run_id 取自消息 payload
+            run_id = str(payload.get("run_id") or uuid.uuid4())
+            await run_llm_report(uuid.UUID(task_id), run_id, bus, cancelled)
+        else:
+            pipeline = PIPELINES.get(task_type)
+            if pipeline is None:
+                raise RuntimeError(f"未知任务类型: {task_type}")
+            await pipeline(uuid.UUID(task_id), bus, cancelled)
         await redis.delete(f"cancel:{task_id}")
     except Exception:
         logger.exception("任务 %s 处理异常", task_id)

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, get_redis
+from app.core.deps import get_current_user_or_query, get_redis
 from app.events.event_bus import EventBus
 from app.models.task import Task
 from app.models.user import User
@@ -23,7 +23,7 @@ async def task_events(
     task_id: str,
     request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
-    user: Annotated[User, Depends(get_current_user)],
+    user: Annotated[User, Depends(get_current_user_or_query)],
     redis: Annotated[Redis, Depends(get_redis)],
 ):
     """订阅任务事件流: 分析进度 / 解析日志行 / LLM token / 结论.
