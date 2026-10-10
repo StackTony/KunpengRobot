@@ -2,18 +2,22 @@
 
 基于 Python 的轻量级智能运维平台，支持部署到 **ARM（鲲鹏）/ x86** 架构的 **Linux 与 Windows** 环境，提供 Web 端访问。
 
-> 当前为项目骨架阶段（v0.1）：核心链路（认证 / 上传 / 队列 / SSE / 规则 / 指标）已打通，界面为空数据预览状态。
+> v0.2：认证 / 团队协作 / 日志解析 / 规则引擎 / 按需 LLM 总结 / 性能图表 / 审计 全链路已实现。前端基于开源项目 [witty-log-analyzer](https://atomgit.com/StackTony/witty-log-analyzer)（MulanPSL-2.0）的 o-design 实现整体替换重构。
 
 ## 功能特性
 
-- **用户权限控制**：JWT + RBAC（管理员 / 普通用户），令牌黑名单登出
-- **故障诊断**：被动上传日志包（zip/tar/文本），后台并发解析 + 规则匹配 + LLM 智能总结，SSE 实时流式输出
-- **智能巡检**：检查项插件化（`Checker` 注册制），复用规则引擎，支持定时触发
-- **规则管理**：管理员对巡检规则增删改查，正则安全校验、版本化热加载、变更审计
-- **性能图表**：ECharts 时序图表，数据持久化于 PostgreSQL 时间分区表，刷新 / 切页签不丢失
-- **高并发设计**：API 与分析层解耦，Redis Stream 任务队列 + 事件总线，支持 100+ QPS 并发上传
+- **用户权限控制**：JWT + RBAC，平台管理员 / 普通用户 + 团队级三角色（创建者 / 管理员 / 普通用户），令牌刷新与黑名单登出
+- **团队协作**：团队创建 / 申请加入 / 邀请审批 / 成员角色调整，资产库（按团队隔离）管理
+- **日志解析**：6 种解析器插件（Linux syslog / Nginx / Windows 事件 / Redfish / Java 应用 / 通用兜底），上传前 512KB 预检，文件上传与粘贴文本两种模式
+- **故障诊断**：被动上传日志包，Redis Stream 队列并发分析（100+ QPS），SSE 实时流式输出，原始日志服务端分页筛选
+- **智能巡检**：规则引擎优先匹配 + 按需 LLM 智能总结（SSE 流式生成，未配置 LLM 自动降级纯规则）
+- **规则管理**：管理员对巡检规则增删改查（关键字 / 正则 / 阈值三类），正则灾难性回溯防护、版本化热加载、变更审计
+- **性能图表**：ECharts 时序图表，服务端降采样查询，视图配置服务端持久化（刷新 / 切页签 / 换设备不丢失）
+- **审计日志**：团队级操作审计（任务 / 资产 / 成员 / 规则变更），支持按动作与关键字检索
 
 ## 界面预览
+
+> 以下为 v0.1 旧版（Element Plus）界面截图，v0.2 已切换为 o-design 风格新前端，新版截图待补充。
 
 | 登录 | 总览 |
 |------|------|
@@ -33,7 +37,7 @@
 |----|------|
 | 后端 | Python 3.11+ · FastAPI · SQLAlchemy(async) · APScheduler |
 | 中间件 | PostgreSQL（元数据 + 时间分区指标）· Redis（任务队列 / 事件总线 / 限流） |
-| 前端 | Vue 3 · Element Plus · Pinia · ECharts · Vite |
+| 前端 | Vue 3 · TypeScript · Pinia · Vue Router · ECharts · Vite 6（o-design 风格，无重型组件库） |
 | LLM | OpenAI 兼容 API（可选，未配置时自动降级为纯规则分析） |
 
 ## 快速开始
@@ -63,6 +67,18 @@ python -m app.worker
 ```
 
 默认管理员账号：`admin / admin123`（首次登录后请修改）。
+
+演示账号（密码统一 `demo123`，`SEED_DEMO_DATA=True` 时自动初始化，生产环境请关闭）：
+
+| 账号 | 姓名 | 平台角色 | 团队角色（演示团队） |
+|------|------|----------|----------------------|
+| guchuang | 顾创建 | 管理员 | 北京A · 创建者 |
+| jiangguanli | 蒋管理 | 普通用户 | 北京A · 管理员；上海B · 创建者 |
+| sunputong | 孙普通 | 普通用户 | 北京A · 普通成员（有一条待处理邀请） |
+| zhangshenpi | 张审批 | 普通用户 | 上海B · 管理员（有一条待审批申请） |
+| liyiban | 李一般 | 普通用户 | 无团队（可体验申请加入流程） |
+
+登录页提供演示账号一键填充，便于快速体验不同角色视角下的权限差异。
 
 API 文档：http://localhost:8000/docs
 
@@ -106,7 +122,7 @@ KunpengRobot/
 │       ├── modules/        # 诊断流水线 / 巡检 / 解析器与检查项插件
 │       ├── worker/         # Worker 消费循环 + 定时调度
 │       └── metrics/        # 指标分区管理
-├── frontend/               # Vue3 + Element Plus
+├── frontend/               # Vue3 + TS + Pinia（o-design 风格，基于 witty-log-analyzer）
 ├── deploy/                 # docker-compose / Nginx / 裸机脚本
 └── docs/                   # 框架设计文档 / 界面截图
 ```
@@ -123,4 +139,5 @@ KunpengRobot/
 
 ## License
 
-MIT
+- 后端及整体项目：MIT
+- 前端（`frontend/`）：基于 [witty-log-analyzer](https://atomgit.com/StackTony/witty-log-analyzer) 修改，遵循 [MulanPSL-2.0](frontend/LICENSE-witty)
