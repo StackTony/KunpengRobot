@@ -1,172 +1,39 @@
-/* ============================================================
-   鲲鹏运维平台 设计 token (全局覆盖 Element Plus 变量)
-   一处定义全局生效: 颜色 / 圆角 / 字号 / 间距
-   ============================================================ */
+/* witty 设计令牌（对齐 witty-ub web_new / assets/main.css） */
 :root {
-  /* ---- 品牌色: 深邃科技蓝 ---- */
-  --el-color-primary: #2f5cac;
-  --el-color-primary-light-3: #5a7fbd;
-  --el-color-primary-light-5: #87a4ce;
-  --el-color-primary-light-7: #b3c9df;
-  --el-color-primary-light-8: #c9d8e9;
-  --el-color-primary-light-9: #e6edf7;
-  --el-color-primary-dark-2: #254a8a;
+  --primary: #1e6fff;
+  --primary-hover: #4d8fff;
+  --primary-soft: #ebf2ff;
+  --primary-tint: #ebf2ff;
 
-  /* ---- 语义色 (severity) ---- */
-  --kp-severity-info: #909399;
-  --kp-severity-warn: #b88230;
-  --kp-severity-error: #d95050;
-  --kp-severity-critical: #c3272b;
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --surface-3: #f5f7fa;
+  --border: #d9e0e8;
+  --border-strong: #b9c4d0;
 
-  /* ---- 中性色 ---- */
-  --kp-bg-canvas: #f5f7fa;        /* 画布 */
-  --kp-bg-sidebar: #1d2433;       /* 侧边栏 */
-  --kp-bg-sidebar-hover: #262f42;
-  --kp-border-card: #ebedf2;      /* 卡片边框 */
-  --kp-text-primary: #303133;
-  --kp-text-secondary: #606266;
+  --text-1: #1f2a3a;
+  --text-2: #6b7a8d;
+  --text-3: #8b99aa;
+  --text-4: #b0bac5;
 
-  /* ---- 形状与字号 ---- */
-  --el-border-radius-base: 6px;
-  --el-border-radius-small: 4px;
-  --el-font-size-base: 13px;
+  --success: #00b365;
+  --success-soft: #ecfdf5;
+  --success-deep: #047857;
+  --warning: #f59e0b;
+  --warning-soft: #fff7ed;
+  --warning-deep: #b45309;
+  --danger: #ef4444;
+  --danger-soft: #fef2f2;
+  --danger-deep: #b91c1c;
+
+  --radius: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.1);
+
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --mono: 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+
+  --topbar-h: 56px;
 }
-
-/* ---- 全局基础 ---- */
-html, body, #app {
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
-  font-size: 13px;
-  color: var(--kp-text-primary);
-  background: var(--kp-bg-canvas);
-  -webkit-font-smoothing: antialiased;
-}
-
-/* ---- 卡片: 细边框 + 无阴影, 简约 ---- */
-.el-card {
-  border-radius: 8px;
-  border: 1px solid var(--kp-border-card);
-  box-shadow: none;
-}
-
-.el-card__header {
-  padding: 14px 20px;
-  font-weight: 600;
-  font-size: 14px;
-  border-bottom: 1px solid var(--kp-border-card);
-}
-
-/* ---- 表格 ---- */
-.el-table {
-  --el-table-header-bg-color: #f7f8fb;
-  --el-table-header-text-color: #606266;
-  --el-table-row-hover-bg-color: #f2f6fc;
-}
-
-.el-table th.el-table__cell {
-  font-weight: 600;
-  color: var(--kp-text-secondary);
-}
-
-/* ---- 侧边栏菜单 (深色) ---- */
-.kp-sidebar .el-menu {
-  background: transparent;
-  border-right: none;
-  --el-menu-bg-color: transparent;
-  --el-menu-text-color: #a8b0c2;
-  --el-menu-hover-bg-color: var(--kp-bg-sidebar-hover);
-  --el-menu-active-color: #ffffff;
-  --el-menu-item-height: 46px;
-}
-
-.kp-sidebar .el-menu-item {
-  margin: 2px 10px;
-  border-radius: 6px;
-}
-
-.kp-sidebar .el-menu-item.is-active {
-  background: rgba(90, 127, 189, 0.22);
-  position: relative;
-}
-
-.kp-sidebar .el-menu-item.is-active::before {
-  content: '';
-  position: absolute;
-  left: -10px;
-  top: 12px;
-  bottom: 12px;
-  width: 3px;
-  border-radius: 2px;
-  background: #6d94d6;
-}
-
-/* ---- 统一页面容器 ---- */
-.kp-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.kp-page-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin: 0 0 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.kp-page-title::before {
-  content: '';
-  width: 3px;
-  height: 14px;
-  border-radius: 2px;
-  background: var(--el-color-primary);
-}
-
-/* ---- 统计卡 ---- */
-.kp-stat {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.kp-stat-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-}
-
-.kp-stat-value {
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-}
-
-.kp-stat-label {
-  font-size: 12px;
-  color: var(--kp-text-secondary);
-}
-
-/* ---- severity 标签色 ---- */
-.kp-tag-critical {
-  --el-tag-bg-color: #fdf0ef;
-  --el-tag-border-color: #f7c6c5;
-  --el-tag-text-color: var(--kp-severity-critical);
-}
-
-/* ---- 滚动条 ---- */
-::-webkit-scrollbar { width: 8px; height: 8px; }
-::-webkit-scrollbar-thumb { background: #d0d4dc; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #b8becc; }
-::-webkit-scrollbar-track { background: transparent; }
